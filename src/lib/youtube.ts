@@ -36,7 +36,8 @@ export function extractVideoId(input: string): string | null {
       }
       // /shorts/<id>, /embed/<id>, /live/<id>
       const parts = path.split("/").filter(Boolean);
-      if (parts.length >= 2 && ["shorts", "embed", "live"].includes(parts[0])) {
+      const firstPart = parts[0];
+      if (parts.length >= 2 && firstPart && ["shorts", "embed", "live"].includes(firstPart)) {
         return parts[1] ?? null;
       }
     }
