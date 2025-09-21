@@ -10,6 +10,7 @@
 - [x] Hide notes and comments if there's no video link or id
 - [x] Add loading state when fetching video details
 - [x] Add error handling for invalid video id or link
+- [x] Add pagination for comments if there are many comments
 - [ ] Add pagination for comments if there are many comments
 - [ ] Allow editing self comments and deleting self comments if user is owner of video let them delete others comments as well if not dont
 - [ ] update auth flow to less button clicks

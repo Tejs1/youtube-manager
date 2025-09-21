@@ -91,7 +91,7 @@ export const youtubeRouter = createTRPCRouter({
     }),
 
   listComments: protectedProcedure
-    .input(z.object({ videoId: z.string().min(3) }))
+    .input(z.object({ videoId: z.string().min(3), pageToken: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       try {
         const resolvedId = (() => {
@@ -109,6 +109,7 @@ export const youtubeRouter = createTRPCRouter({
             maxResults: 50,
             textFormat: "plainText",
             order: "time",
+            pageToken: input.pageToken,
           },
         });
         await logEvent(ctx.db, {

@@ -57,13 +57,17 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [noteText, setNoteText] = useState("");
+  const [commentsPageToken, setCommentsPageToken] = useState<string | undefined>(
+    undefined,
+  );
+  const [prevCommentTokens, setPrevCommentTokens] = useState<string[]>([]);
 
   const videoQuery = api.youtube.fetchVideo.useQuery(
     { videoId },
     { enabled: !!videoId && signedIn },
   );
   const commentsQuery = api.youtube.listComments.useQuery(
-    { videoId },
+    { videoId, pageToken: commentsPageToken },
     { enabled: !!videoId && signedIn },
   );
   const noteQuery = api.notes.get.useQuery(
@@ -94,6 +98,12 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     setNoteText((noteQuery.data as { content?: string })?.content ?? "");
   }, [noteQuery.data]);
+
+  // Reset comments pagination when video changes
+  useEffect(() => {
+    setCommentsPageToken(undefined);
+    setPrevCommentTokens([]);
+  }, [videoId]);
 
   // Helper function to get user-friendly error message
   const getErrorMessage = (error: unknown): string => {
@@ -399,6 +409,41 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                       Loading comments...
                     </div>
                   )}
+                  {(() => {
+                    const nextToken = (commentsQuery.data as { nextPageToken?: string })?.nextPageToken;
+                    return (
+                      <div className="mt-4 flex items-center justify-between">
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            if (prevCommentTokens.length) {
+                              const copy = [...prevCommentTokens];
+                              const prev = copy.pop();
+                              setPrevCommentTokens(copy);
+                              setCommentsPageToken(prev && prev.length ? prev : undefined);
+                            }
+                          }}
+                          disabled={!prevCommentTokens.length || commentsQuery.isLoading}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            if (nextToken) {
+                              setPrevCommentTokens([
+                                ...prevCommentTokens,
+                                commentsPageToken ?? "",
+                              ]);
+                              setCommentsPageToken(nextToken);
+                            }
+                          }}
+                          disabled={!nextToken || commentsQuery.isLoading}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </>
             )}
