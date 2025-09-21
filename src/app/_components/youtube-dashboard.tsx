@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SimpleThemeToggle } from "@/components/simple-theme-toggle";
+import { extractVideoId, buildEmbedUrl, buildThumbnailUrl } from "@/lib/youtube";
 import Link from "next/link";
 import { Trash2, AlertCircle, MessageSquareOff } from "lucide-react";
 
@@ -142,11 +143,11 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex-1">
             <label htmlFor="videoId" className="mb-1 block font-medium text-sm">
-              Video ID
+              Video ID or URL
             </label>
             <Input
               id="videoId"
-              placeholder="e.g. dQw4w9WgXcQ"
+              placeholder="e.g. dQw4w9WgXcQ or https://youtu.be/dQw4w9WgXcQ"
               value={videoId}
               onChange={(e) => setVideoId(e.target.value.trim())}
             />
@@ -175,10 +176,41 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
         </Alert>
       )}
 
+      {videoQuery.isLoading && (
+        <Card className="mb-6 p-4">
+          <div className="text-muted-foreground text-sm">Loading video...</div>
+        </Card>
+      )}
+
       {video && (
         <Card className="mb-6 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col gap-4">
+            {(() => {
+              const vid = ((video as unknown as { id?: string })?.id) || extractVideoId(videoId) || videoId;
+              return vid ? (
+                <div className="w-full">
+                  <div className="w-full overflow-hidden rounded-md border">
+                    <iframe
+                      className="aspect-video w-full"
+                      src={buildEmbedUrl(vid)}
+                      title="YouTube video player"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <img
+                      src={buildThumbnailUrl(vid, "hq")}
+                      alt="Video thumbnail"
+                      className="h-auto w-full max-w-md rounded-md border"
+                    />
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
               <h2 className="font-semibold text-xl">
                 {video?.snippet?.title ?? "Untitled"}
               </h2>
@@ -194,59 +226,60 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                   Likes: {video?.statistics?.likeCount ?? "-"}
                 </span>
               </div>
-            </div>
-            {signedIn && (
-              <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogTrigger asChild>
-                  <Button>Edit</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Edit Video</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <Input
-                      placeholder="Title"
-                      defaultValue={video?.snippet?.title ?? ""}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                    <Textarea
-                      placeholder="Description"
-                      defaultValue={video?.snippet?.description ?? ""}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-40"
-                    />
-                    {updateVideo.error && (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          {getErrorMessage(updateVideo.error)}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() =>
-                          updateVideo.mutate({
-                            videoId,
-                            title: title || undefined,
-                            description: description || undefined,
-                          })
-                        }
-                        disabled={updateVideo.isPending}
-                      >
-                        {updateVideo.isPending ? "Saving..." : "Save"}
-                      </Button>
+              </div>
+              {signedIn && (
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                  <DialogTrigger asChild>
+                    <Button>Edit</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Video</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="Title"
+                        defaultValue={video?.snippet?.title ?? ""}
+                        onChange={(e) => setTitle(e.target.value)}
+                      />
+                      <Textarea
+                        placeholder="Description"
+                        defaultValue={video?.snippet?.description ?? ""}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="min-h-40"
+                      />
+                      {updateVideo.error && (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {getErrorMessage(updateVideo.error)}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          onClick={() =>
+                            updateVideo.mutate({
+                              videoId,
+                              title: title || undefined,
+                              description: description || undefined,
+                            })
+                          }
+                          disabled={updateVideo.isPending}
+                        >
+                          {updateVideo.isPending ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
         </Card>
       )}
 
-      {signedIn && (
+      {signedIn && !!videoId && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-4">
             <h3 className="mb-3 font-medium text-lg">Comments</h3>

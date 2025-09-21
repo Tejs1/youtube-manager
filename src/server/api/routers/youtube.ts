@@ -3,6 +3,7 @@ import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { youtubeFetch } from "@/server/google";
 import { logEvent } from "@/server/logging";
 import { TRPCError } from "@trpc/server";
+import { extractVideoId } from "@/lib/youtube";
 
 // Helper function to handle YouTube API errors
 function handleYouTubeError(error: unknown): never {
@@ -56,16 +57,24 @@ export const youtubeRouter = createTRPCRouter({
     .input(z.object({ videoId: z.string().min(3) }))
     .query(async ({ ctx, input }) => {
       try {
+        const resolvedId = (() => {
+          const extracted = extractVideoId(input.videoId);
+          if (extracted) return extracted;
+          if (/^https?:\/\//i.test(input.videoId)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid YouTube URL" });
+          }
+          return input.videoId;
+        })();
         const data = await youtubeFetch<{ items: unknown[] }>(ctx.session.user.id, "/videos", {
           query: {
             part: "snippet,statistics,contentDetails,status",
-            id: input.videoId,
+            id: resolvedId,
           },
         });
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "video.fetch",
-          videoId: input.videoId,
+          videoId: resolvedId,
           status: "success",
         });
         return data.items?.[0] ?? null;
@@ -85,10 +94,18 @@ export const youtubeRouter = createTRPCRouter({
     .input(z.object({ videoId: z.string().min(3) }))
     .query(async ({ ctx, input }) => {
       try {
+        const resolvedId = (() => {
+          const extracted = extractVideoId(input.videoId);
+          if (extracted) return extracted;
+          if (/^https?:\/\//i.test(input.videoId)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid YouTube URL" });
+          }
+          return input.videoId;
+        })();
         const data = await youtubeFetch(ctx.session.user.id, "/commentThreads", {
           query: {
             part: "snippet,replies",
-            videoId: input.videoId,
+            videoId: resolvedId,
             maxResults: 50,
             textFormat: "plainText",
             order: "time",
@@ -97,7 +114,7 @@ export const youtubeRouter = createTRPCRouter({
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "comments.list",
-          videoId: input.videoId,
+          videoId: resolvedId,
           status: "success",
         });
         return data as unknown;
@@ -117,12 +134,20 @@ export const youtubeRouter = createTRPCRouter({
     .input(z.object({ videoId: z.string().min(3), text: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       try {
+        const resolvedId = (() => {
+          const extracted = extractVideoId(input.videoId);
+          if (extracted) return extracted;
+          if (/^https?:\/\//i.test(input.videoId)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid YouTube URL" });
+          }
+          return input.videoId;
+        })();
         const data = await youtubeFetch(ctx.session.user.id, "/commentThreads", {
           method: "POST",
           query: { part: "snippet" },
           body: {
             snippet: {
-              videoId: input.videoId,
+              videoId: resolvedId,
               topLevelComment: { snippet: { textOriginal: input.text } },
             },
           },
@@ -130,7 +155,7 @@ export const youtubeRouter = createTRPCRouter({
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "comment.add",
-          videoId: input.videoId,
+          videoId: resolvedId,
           targetType: "comment",
           status: "success",
           metadata: { text: input.text },
@@ -218,8 +243,16 @@ export const youtubeRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { videoId, title, description } = input;
+      const { videoId: rawVideoId, title, description } = input;
       try {
+        const videoId = (() => {
+          const extracted = extractVideoId(rawVideoId);
+          if (extracted) return extracted;
+          if (/^https?:\/\//i.test(rawVideoId)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid YouTube URL" });
+          }
+          return rawVideoId;
+        })();
         // Get current snippet to preserve required fields like categoryId
         const current = await youtubeFetch<{ items?: Array<{ snippet: { title?: string; description?: string;[key: string]: unknown } }> }>(ctx.session.user.id, "/videos", {
           query: { part: "snippet", id: videoId },
@@ -250,7 +283,7 @@ export const youtubeRouter = createTRPCRouter({
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "video.update",
-          videoId,
+          videoId: rawVideoId,
           status: "error",
           message: String(error instanceof Error ? error.message : error),
         });
@@ -258,4 +291,3 @@ export const youtubeRouter = createTRPCRouter({
       }
     }),
 });
-
