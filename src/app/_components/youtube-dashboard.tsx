@@ -23,6 +23,7 @@ type Video = {
   snippet?: {
     title?: string;
     description?: string;
+    channelId?: string;
   };
   statistics?: {
     viewCount?: string;
@@ -35,6 +36,7 @@ type Comment = {
   id?: string;
   snippet?: {
     authorDisplayName?: string;
+    authorChannelId?: { value?: string };
     textDisplay?: string;
     textOriginal?: string;
     publishedAt?: string;
@@ -74,6 +76,9 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
     { videoId },
     { enabled: !!videoId && signedIn },
   );
+  const myChannelQuery = api.youtube.getMyChannelId.useQuery(undefined, {
+    enabled: signedIn,
+  });
 
   const updateVideo = api.youtube.updateVideo.useMutation({
     onSuccess: () => {
@@ -90,10 +95,15 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   const deleteComment = api.youtube.deleteComment.useMutation({
     onSuccess: () => void commentsQuery.refetch(),
   });
+  const updateComment = api.youtube.updateComment.useMutation({
+    onSuccess: () => void commentsQuery.refetch(),
+  });
   const upsertNote = api.notes.upsert.useMutation();
 
   const video = videoQuery.data as Video | null;
   const threads = (commentsQuery.data as { items?: CommentThread[] })?.items ?? [];
+  const myChannelId = (myChannelQuery.data as string | null) ?? null;
+  const isOwner = !!(video?.snippet?.channelId && myChannelId && video?.snippet?.channelId === myChannelId);
 
   useEffect(() => {
     setNoteText((noteQuery.data as { content?: string })?.content ?? "");
@@ -340,28 +350,53 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                         {t?.snippet?.topLevelComment?.snippet?.textDisplay ??
                           t?.snippet?.topLevelComment?.snippet?.textOriginal}
                       </p>
-                      <div className="mt-2 flex gap-2">
-                        <ReplyBox
-                          onReply={(text) =>
-                            replyToComment.mutate({
-                              parentId: t?.snippet?.topLevelComment?.id ?? "",
-                              text,
-                            })
-                          }
-                          disabled={replyToComment.isPending}
-                        />
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={() =>
-                            deleteComment.mutate({
-                              commentId: t?.snippet?.topLevelComment?.id ?? "",
-                            })
-                          }
-                          disabled={deleteComment.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(() => {
+                          const authorId = t?.snippet?.topLevelComment?.snippet?.authorChannelId?.value;
+                          const canEdit = !!(authorId && myChannelId && authorId === myChannelId);
+                          const canDelete = !!(isOwner || canEdit);
+                          return (
+                            <>
+                              {canEdit && (
+                                <EditBox
+                                  initialText={
+                                    t?.snippet?.topLevelComment?.snippet?.textOriginal ?? ""
+                                  }
+                                  onSave={(text) =>
+                                    updateComment.mutate({
+                                      commentId: t?.snippet?.topLevelComment?.id ?? "",
+                                      text,
+                                    })
+                                  }
+                                  disabled={updateComment.isPending}
+                                />
+                              )}
+                              <ReplyBox
+                                onReply={(text) =>
+                                  replyToComment.mutate({
+                                    parentId: t?.snippet?.topLevelComment?.id ?? "",
+                                    text,
+                                  })
+                                }
+                                disabled={replyToComment.isPending}
+                              />
+                              {canDelete && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() =>
+                                    deleteComment.mutate({
+                                      commentId: t?.snippet?.topLevelComment?.id ?? "",
+                                    })
+                                  }
+                                  disabled={deleteComment.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {replyToComment.error && (
@@ -369,6 +404,15 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                           <AlertCircle className="h-4 w-4" />
                           <AlertDescription>
                             {getErrorMessage(replyToComment.error)}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {updateComment.error && (
+                        <Alert className="mt-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {getErrorMessage(updateComment.error)}
                           </AlertDescription>
                         </Alert>
                       )}
@@ -384,17 +428,47 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 
                       {t?.replies?.comments?.length ? (
                         <div className="mt-3 border-t pt-2">
-                          {t.replies.comments.map((c) => (
-                            <div key={c.id} className="mt-2 text-sm">
-                              <span className="font-medium">
-                                {c?.snippet?.authorDisplayName}
-                              </span>
-                              <p className="whitespace-pre-wrap">
-                                {c?.snippet?.textDisplay ??
-                                  c?.snippet?.textOriginal}
-                              </p>
-                            </div>
-                          ))}
+                          {t.replies.comments.map((c) => {
+                            const authorId = c?.snippet?.authorChannelId?.value;
+                            const canEdit = !!(authorId && myChannelId && authorId === myChannelId);
+                            const canDelete = !!(isOwner || canEdit);
+                            return (
+                              <div key={c.id} className="mt-2 text-sm">
+                                <span className="font-medium">
+                                  {c?.snippet?.authorDisplayName}
+                                </span>
+                                <p className="whitespace-pre-wrap">
+                                  {c?.snippet?.textDisplay ?? c?.snippet?.textOriginal}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {canEdit && (
+                                    <EditBox
+                                      initialText={c?.snippet?.textOriginal ?? ""}
+                                      onSave={(text) =>
+                                        updateComment.mutate({
+                                          commentId: c?.id ?? "",
+                                          text,
+                                        })
+                                      }
+                                      disabled={updateComment.isPending}
+                                    />
+                                  )}
+                                  {canDelete && (
+                                    <Button
+                                      variant="destructive"
+                                      size="icon"
+                                      onClick={() =>
+                                        deleteComment.mutate({ commentId: c?.id ?? "" })
+                                      }
+                                      disabled={deleteComment.isPending}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : null}
                     </div>
@@ -528,6 +602,29 @@ function ReplyBox({ onReply, disabled }: { onReply: (text: string) => void; disa
         disabled={disabled || !text.trim()}
       >
         Reply
+      </Button>
+    </div>
+  );
+}
+
+function EditBox({ initialText, onSave, disabled }: { initialText: string; onSave: (text: string) => void; disabled?: boolean }) {
+  const [text, setText] = useState(initialText);
+  useEffect(() => setText(initialText), [initialText]);
+  return (
+    <div className="flex gap-2">
+      <Input
+        placeholder="Edit comment..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={disabled}
+      />
+      <Button
+        onClick={() => {
+          if (text.trim()) onSave(text.trim());
+        }}
+        disabled={disabled || !text.trim()}
+      >
+        Save
       </Button>
     </div>
   );

@@ -13,6 +13,7 @@
 - [x] Add pagination for comments if there are many comments
 - [ ] Add pagination for comments if there are many comments
 - [ ] Allow editing self comments and deleting self comments if user is owner of video let them delete others comments as well if not dont
+- [x] Allow editing self comments and deleting self comments; if user owns the video, allow deleting others' comments too
 - [ ] update auth flow to less button clicks
 - [ ] add notes with video time stamps
 - [ ] make google app in live mode from test

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { youtubeFetch } from "@/server/google";
+import { youtubeFetch, getMyChannelId } from "@/server/google";
 import { logEvent } from "@/server/logging";
 import { TRPCError } from "@trpc/server";
 import { extractVideoId } from "@/lib/youtube";
@@ -234,6 +234,57 @@ export const youtubeRouter = createTRPCRouter({
         handleYouTubeError(error);
       }
     }),
+
+  updateComment: protectedProcedure
+    .input(z.object({ commentId: z.string().min(3), text: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const data = await youtubeFetch(ctx.session.user.id, "/comments", {
+          method: "PUT",
+          query: { part: "snippet" },
+          body: { id: input.commentId, snippet: { textOriginal: input.text } },
+        });
+        await logEvent(ctx.db, {
+          userId: ctx.session.user.id,
+          action: "comment.update",
+          targetType: "comment",
+          targetId: input.commentId,
+          status: "success",
+          metadata: { text: input.text },
+        });
+        return data as unknown;
+      } catch (error: unknown) {
+        await logEvent(ctx.db, {
+          userId: ctx.session.user.id,
+          action: "comment.update",
+          targetType: "comment",
+          targetId: input.commentId,
+          status: "error",
+          message: String(error instanceof Error ? error.message : error),
+        });
+        handleYouTubeError(error);
+      }
+    }),
+
+  getMyChannelId: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const id = await getMyChannelId(ctx.session.user.id);
+      await logEvent(ctx.db, {
+        userId: ctx.session.user.id,
+        action: "me.channelId",
+        status: "success",
+      });
+      return id;
+    } catch (error: unknown) {
+      await logEvent(ctx.db, {
+        userId: ctx.session.user.id,
+        action: "me.channelId",
+        status: "error",
+        message: String(error instanceof Error ? error.message : error),
+      });
+      handleYouTubeError(error);
+    }
+  }),
 
   updateVideo: protectedProcedure
     .input(
