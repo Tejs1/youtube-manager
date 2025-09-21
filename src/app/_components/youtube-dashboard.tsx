@@ -96,9 +96,29 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 	const addComment = api.youtube.addComment.useMutation({
 		onSuccess: () => void commentsQuery.refetch(),
 	});
-	const replyToComment = api.youtube.replyToComment.useMutation({
-		onSuccess: () => void commentsQuery.refetch(),
-	});
+  const replyToComment = api.youtube.replyToComment.useMutation({
+    onSuccess: async (created: unknown, variables) => {
+      // Optimistically inject the new reply into the cached thread
+      const inputKey = { videoId, pageToken: commentsPageToken } as const;
+      utils.youtube.listComments.setData(inputKey, (old) => {
+        const data = (old as { items?: CommentThread[] } | undefined) ?? undefined;
+        if (!data?.items?.length) return old as typeof old;
+        const items = data.items.map((t) => {
+          const parentId = t?.snippet?.topLevelComment?.id;
+          if (parentId !== variables.parentId) return t;
+          const reply = created as unknown as Comment;
+          const existing = t?.replies?.comments ?? [];
+          return {
+            ...t,
+            replies: { comments: [...existing, reply] },
+          } as CommentThread;
+        });
+        return { ...(data as object), items } as unknown as typeof old;
+      });
+      // Also revalidate to refresh counts/order from server
+      await utils.youtube.listComments.invalidate({ videoId });
+    },
+  });
 	const deleteComment = api.youtube.deleteComment.useMutation({
 		onSuccess: () => void commentsQuery.refetch(),
 	});
@@ -357,10 +377,10 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 
 						{!commentsQuery.error && (
 							<>
-								<AddComment
-									onAdd={(text) => addComment.mutate({ videoId, text })}
-									disabled={addComment.isPending}
-								/>
+                <AddComment
+                  onAdd={(text) => addComment.mutate({ videoId, text })}
+                  disabled={addComment.isPending || commentsQuery.isLoading}
+                />
 
 								{addComment.error && (
 									<Alert className="mt-2">
