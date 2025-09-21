@@ -1,25 +1,25 @@
-import type { InferInsertModel } from "drizzle-orm";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eventLogs } from "@/server/db/schema";
 import type * as schema from "@/server/db/schema";
+import type { InferInsertModel } from "drizzle-orm";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 
 export async function logEvent(
-  db: PostgresJsDatabase<typeof schema>,
-  e: Partial<InferInsertModel<typeof eventLogs>> & { action: string }
+	db: PostgresJsDatabase<typeof schema>,
+	e: Partial<InferInsertModel<typeof eventLogs>> & { action: string },
 ) {
-  try {
-    await db.insert(eventLogs).values({
-      action: e.action,
-      userId: e.userId ?? null,
-      videoId: e.videoId ?? null,
-      targetType: e.targetType ?? null,
-      targetId: e.targetId ?? null,
-      status: e.status ?? "success",
-      message: e.message ?? null,
-      metadata: e.metadata ?? null,
-    });
-  } catch (err) {
-    // Swallow logging errors to avoid affecting main flow
-    console.error("Failed to log event", err);
-  }
+	try {
+		await db.insert(eventLogs).values({
+			action: e.action,
+			userId: e.userId ?? null,
+			videoId: e.videoId ?? null,
+			targetType: e.targetType ?? null,
+			targetId: e.targetId ?? null,
+			status: e.status ?? "success",
+			message: e.message ?? null,
+			metadata: e.metadata ?? null,
+		});
+	} catch (err) {
+		// Swallow logging errors to avoid affecting main flow
+		console.error("Failed to log event", err);
+	}
 }

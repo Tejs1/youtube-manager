@@ -37,18 +37,18 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authConfig = {
-    providers: [
-        Google({
-            authorization: {
-                params: {
-                    scope:
-                        "openid email profile https://www.googleapis.com/auth/youtube.force-ssl",
-                    access_type: "offline",
-                    prompt: "consent",
-                },
-            },
-        }),
-    ],
+	providers: [
+		Google({
+			authorization: {
+				params: {
+					scope:
+						"openid email profile https://www.googleapis.com/auth/youtube.force-ssl",
+					access_type: "offline",
+					prompt: "consent",
+				},
+			},
+		}),
+	],
 	adapter: DrizzleAdapter(db, {
 		usersTable: users,
 		accountsTable: accounts,

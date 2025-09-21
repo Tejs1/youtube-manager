@@ -1,6 +1,6 @@
+import { notesRouter } from "@/server/api/routers/notes";
 import { postRouter } from "@/server/api/routers/post";
 import { youtubeRouter } from "@/server/api/routers/youtube";
-import { notesRouter } from "@/server/api/routers/notes";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
