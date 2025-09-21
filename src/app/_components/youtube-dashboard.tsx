@@ -14,10 +14,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SimpleThemeToggle } from "@/components/simple-theme-toggle";
-
-
-
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 
 type Video = any;
 
@@ -210,13 +208,14 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                     />
                     <Button
                       variant="destructive"
+                      size="icon"
                       onClick={() =>
                         deleteComment.mutate({
                           commentId: t?.snippet?.topLevelComment?.id,
                         })
                       }
                     >
-                      Delete
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   {t?.replies?.comments?.length ? (
