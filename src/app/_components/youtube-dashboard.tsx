@@ -159,14 +159,25 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 		setPlayerLoaded(false);
 	}, [videoId]);
 
-	// Debounce input to auto-fetch
+	// Debounce input to auto-fetch with cancellation of in-flight queries
 	useEffect(() => {
-		const handle = setTimeout(() => {
+		const handle = setTimeout(async () => {
 			const next = inputValue.trim();
-			if (next !== videoId) setVideoId(next);
+			if (next !== videoId) {
+				// cancel any in-flight requests for previous input
+				await utils.youtube.fetchVideo.cancel();
+				await utils.youtube.listComments.cancel();
+				await utils.notes.get.cancel();
+				setVideoId(next);
+			}
 		}, 600);
-		return () => clearTimeout(handle);
-	}, [inputValue, videoId]);
+		return () => {
+			clearTimeout(handle);
+			void utils.youtube.fetchVideo.cancel();
+			void utils.youtube.listComments.cancel();
+			void utils.notes.get.cancel();
+		};
+	}, [inputValue, videoId, utils]);
 
 	// Helper function to get user-friendly error message
 	const getErrorMessage = (error: unknown): string => {
@@ -244,8 +255,11 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 					</div>
 					<Button
 						className="mt-3 sm:mt-6"
-						onClick={() => {
+						onClick={async () => {
 							const next = inputValue.trim();
+							await utils.youtube.fetchVideo.cancel();
+							await utils.youtube.listComments.cancel();
+							await utils.notes.get.cancel();
 							setVideoId(next);
 						}}
 					>
