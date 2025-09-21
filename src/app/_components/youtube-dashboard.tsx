@@ -110,10 +110,11 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
     setNoteText((noteQuery.data as { content?: string })?.content ?? "");
   }, [noteQuery.data]);
 
-  // Reset comments pagination when video changes
+  // Reset UI state when video changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Effect intentionally runs when videoId changes to reset state
   useEffect(() => {
     setCommentsPageToken(undefined);
-    setPrevCommentTokens([]);
+    setPrevCommentTokens(() => []);
     setPlayerLoaded(false);
   }, [videoId]);
 
@@ -237,21 +238,21 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 
             <div className="flex items-start justify-between gap-4">
               <div>
-              <h2 className="font-semibold text-xl">
-                {video?.snippet?.title ?? "Untitled"}
-              </h2>
-              <p className="mt-2 whitespace-pre-wrap text-muted-foreground text-sm">
-                {video?.snippet?.description ?? ""}
-              </p>
-              <div className="mt-3 text-muted-foreground text-sm">
-                <span>Views: {video?.statistics?.viewCount ?? "-"}</span>
-                <span className="ml-4">
-                  Comments: {video?.statistics?.commentCount ?? "-"}
-                </span>
-                <span className="ml-4">
-                  Likes: {video?.statistics?.likeCount ?? "-"}
-                </span>
-              </div>
+                <h2 className="font-semibold text-xl">
+                  {video?.snippet?.title ?? "Untitled"}
+                </h2>
+                <p className="mt-2 whitespace-pre-wrap text-muted-foreground text-sm">
+                  {video?.snippet?.description ?? ""}
+                </p>
+                <div className="mt-3 text-muted-foreground text-sm">
+                  <span>Views: {video?.statistics?.viewCount ?? "-"}</span>
+                  <span className="ml-4">
+                    Comments: {video?.statistics?.commentCount ?? "-"}
+                  </span>
+                  <span className="ml-4">
+                    Likes: {video?.statistics?.likeCount ?? "-"}
+                  </span>
+                </div>
               </div>
               {signedIn && (
                 <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -500,7 +501,7 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                               const copy = [...prevCommentTokens];
                               const prev = copy.pop();
                               setPrevCommentTokens(copy);
-                              setCommentsPageToken(prev && prev.length ? prev : undefined);
+                              setCommentsPageToken(prev?.length ? prev : undefined);
                             }
                           }}
                           disabled={!prevCommentTokens.length || commentsQuery.isLoading}

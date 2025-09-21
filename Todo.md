@@ -4,6 +4,10 @@
 - [x] Add support for fetching video details by video link in addition to video id
 - [x] show video title and thumbnail in the UI
 - [x] video player
+- [ ] replies aren't showing up
+- [ ] instead of showing save button directly show edit button and when clicked show save and cancel buttons
+- [ ] update app name meta tags favicon
+- [ ] add debounce for input cancel prev request if new request is made
 - [ ] Improve error messages for failed video fetches
 - [ ] Improve UI/UX for better user experience
 - [x] Allow user to paste video link as input for fetching video details with id
@@ -21,5 +25,5 @@
 - [ ] use hosted db
 - [ ] update envs
 - [ ] make loom video
-- [ ] test 
+- [ ] test
 - [ ] refactor
