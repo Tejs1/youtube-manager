@@ -1,4 +1,6 @@
 import { postRouter } from "@/server/api/routers/post";
+import { youtubeRouter } from "@/server/api/routers/youtube";
+import { notesRouter } from "@/server/api/routers/notes";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -8,6 +10,8 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
 	post: postRouter,
+	youtube: youtubeRouter,
+	notes: notesRouter,
 });
 
 // export type definition of API
