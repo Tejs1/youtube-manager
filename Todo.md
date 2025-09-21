@@ -4,7 +4,9 @@
 - [x] Add support for fetching video details by video link in addition to video id
 - [x] show video title and thumbnail in the UI
 - [x] video player
-- [ ] replies aren't showing up
+- [ ] replies aren't showing up immadiatly after posting a comment
+- [ ] add loading state for comments section
+- [ ] add loading state for notes section
 - [ ] instead of showing save button directly show edit button and when clicked show save and cancel buttons
 - [ ] update app name meta tags favicon
 - [ ] add debounce for input cancel prev request if new request is made
@@ -20,10 +22,10 @@
 - [x] Allow editing self comments and deleting self comments; if user owns the video, allow deleting others' comments too
 - [ ] update auth flow to less button clicks
 - [ ] add notes with video time stamps
-- [ ] make google app in live mode from test
-- [ ] deploy to vercel
-- [ ] use hosted db
-- [ ] update envs
+- [x] make google app in live mode from test
+- [x] deploy to vercel
+- [x] use hosted db
+- [x] update envs
 - [ ] make loom video
-- [ ] test
+- [x] test
 - [ ] refactor
