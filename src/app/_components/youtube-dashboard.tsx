@@ -63,6 +63,7 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
     undefined,
   );
   const [prevCommentTokens, setPrevCommentTokens] = useState<string[]>([]);
+  const [playerLoaded, setPlayerLoaded] = useState(false);
 
   const videoQuery = api.youtube.fetchVideo.useQuery(
     { videoId },
@@ -113,6 +114,7 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     setCommentsPageToken(undefined);
     setPrevCommentTokens([]);
+    setPlayerLoaded(false);
   }, [videoId]);
 
   // Helper function to get user-friendly error message
@@ -211,20 +213,24 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                 <div className="w-full">
                   <div className="w-full overflow-hidden rounded-md border">
                     <iframe
+                      key={vid}
                       className="aspect-video w-full"
                       src={buildEmbedUrl(vid)}
                       title="YouTube video player"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
+                      onLoad={() => setPlayerLoaded(true)}
                     />
                   </div>
-                  <div className="mt-3">
-                    <img
-                      src={buildThumbnailUrl(vid, "hq")}
-                      alt="Video thumbnail"
-                      className="h-auto w-full max-w-md rounded-md border"
-                    />
-                  </div>
+                  {!playerLoaded && (
+                    <div className="mt-3">
+                      <img
+                        src={buildThumbnailUrl(vid, "hq")}
+                        alt="Video thumbnail"
+                        className="h-auto w-full max-w-md rounded-md border"
+                      />
+                    </div>
+                  )}
                 </div>
               ) : null;
             })()}
