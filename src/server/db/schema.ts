@@ -98,11 +98,59 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
 }));
 
 export const verificationTokens = createTable(
-	"verification_token",
-	(d) => ({
-		identifier: d.varchar({ length: 255 }).notNull(),
-		token: d.varchar({ length: 255 }).notNull(),
-		expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
-	}),
-	(t) => [primaryKey({ columns: [t.identifier, t.token] })],
+    "verification_token",
+    (d) => ({
+        identifier: d.varchar({ length: 255 }).notNull(),
+        token: d.varchar({ length: 255 }).notNull(),
+        expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
+    }),
+    (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);
+
+// App-specific tables
+
+export const notes = createTable(
+    "note",
+    (d) => ({
+        id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+        userId: d
+            .varchar({ length: 255 })
+            .notNull()
+            .references(() => users.id),
+        videoId: d.varchar({ length: 64 }).notNull(),
+        content: d.text().notNull(),
+        createdAt: d
+            .timestamp({ withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+        updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
+    }),
+    (t) => [
+        index("note_user_idx").on(t.userId),
+        index("note_video_idx").on(t.videoId),
+    ],
+);
+
+export const eventLogs = createTable(
+    "event_log",
+    (d) => ({
+        id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+        userId: d.varchar({ length: 255 }).references(() => users.id),
+        action: d.varchar({ length: 128 }).notNull(),
+        videoId: d.varchar({ length: 64 }),
+        targetType: d.varchar({ length: 64 }),
+        targetId: d.varchar({ length: 128 }),
+        status: d.varchar({ length: 16 }).notNull().default("success"),
+        message: d.text(),
+        metadata: d.json(),
+        createdAt: d
+            .timestamp({ withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+    }),
+    (t) => [
+        index("event_user_idx").on(t.userId),
+        index("event_video_idx").on(t.videoId),
+        index("event_action_idx").on(t.action),
+    ],
 );

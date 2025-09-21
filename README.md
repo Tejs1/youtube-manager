@@ -1,29 +1,85 @@
-# Create T3 App
+# YouTube Companion Dashboard
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Mini-dashboard built with the T3 stack + shadcn/ui to manage a YouTube video: view details, manage comments, edit title/description, keep private notes, and capture event logs.
 
-## What's next? How do I make an app with this?
+## Setup
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+1) Create a Google Cloud OAuth client (Web) and enable the YouTube Data API v3 for your project.
+- Authorized redirect URI: `/api/auth/callback/google`
+- Scopes used: `openid email profile https://www.googleapis.com/auth/youtube.force-ssl`
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+2) Environment variables (`.env`):
+- `AUTH_SECRET` — `npx auth secret`
+- `AUTH_GOOGLE_ID` — Google OAuth Client ID
+- `AUTH_GOOGLE_SECRET` — Google OAuth Client Secret
+- `DATABASE_URL` — Postgres connection URL
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+3) Database
+- Generate/push schema with Drizzle (`pnpm run db:push` or `bun run db:push`).
 
-## Learn More
+4) Dev
+- `pnpm dev` (or `bun dev` / `npm run dev`)
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+## API Endpoints (tRPC procedures)
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+All endpoints are authenticated unless noted. They are exposed via tRPC under `/api/trpc`.
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+- youtube.fetchVideo
+  - Input: `{ videoId: string }`
+  - Returns one Video resource (snippet, statistics, contentDetails, status)
+- youtube.listComments
+  - Input: `{ videoId: string }`
+  - Returns commentThreads with top-level comments and replies
+- youtube.addComment
+  - Input: `{ videoId: string, text: string }`
+  - Inserts a top-level comment on the video
+- youtube.replyToComment
+  - Input: `{ parentId: string, text: string }`
+  - Replies to an existing top-level comment
+- youtube.deleteComment
+  - Input: `{ commentId: string }`
+  - Deletes a comment (must be authored by the authenticated channel)
+- youtube.updateVideo
+  - Input: `{ videoId: string, title?: string, description?: string }`
+  - Updates video snippet fields (title/description). Preserves other snippet fields.
+- notes.get
+  - Input: `{ videoId: string }`
+  - Returns a single note entry for the current user + video (if exists)
+- notes.upsert
+  - Input: `{ videoId: string, content: string }`
+  - Creates/updates the note for the current user + video
+- notes.delete
+  - Input: `{ videoId: string }`
+  - Deletes the note for the current user + video
 
-## How do I deploy this?
+Event logs are captured automatically for all above actions.
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+## Database Schema (Drizzle)
+
+Tables added on top of NextAuth defaults:
+
+- notes (`youtube-manager_note`)
+  - `id` integer PK
+  - `userId` varchar FK -> user.id
+  - `videoId` varchar(64)
+  - `content` text
+  - `createdAt` timestamptz default now
+  - `updatedAt` timestamptz on update
+
+- event_logs (`youtube-manager_event_log`)
+  - `id` integer PK
+  - `userId` varchar FK -> user.id (nullable)
+  - `action` varchar(128)
+  - `videoId` varchar(64) (nullable)
+  - `targetType` varchar(64) (nullable)
+  - `targetId` varchar(128) (nullable)
+  - `status` varchar(16) default 'success'
+  - `message` text (nullable)
+  - `metadata` json (nullable)
+  - `createdAt` timestamptz default now
+
+Auth/Accounts tables are provided by NextAuth + Drizzle adapter.
+
+## Theming
+
+Brand-forward theming is configured with shadcn/ui using a YouTube-inspired red accent. See `src/styles/globals.css` for CSS variables (light/dark). UI components live under `src/components/ui/*`.
