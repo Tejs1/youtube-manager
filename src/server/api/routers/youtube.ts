@@ -2,6 +2,54 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { youtubeFetch } from "@/server/google";
 import { logEvent } from "@/server/logging";
+import { TRPCError } from "@trpc/server";
+
+// Helper function to handle YouTube API errors
+function handleYouTubeError(error: unknown): never {
+  if (error instanceof Error) {
+    const errorMessage = error.message;
+
+    // Check for specific YouTube API errors
+    if (errorMessage.includes("403") && errorMessage.includes("commentsDisabled")) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Comments are disabled for this video",
+        cause: error,
+      });
+    }
+
+    if (errorMessage.includes("403")) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Access denied. Please check your permissions or try signing in again.",
+        cause: error,
+      });
+    }
+
+    if (errorMessage.includes("404")) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Video not found or is private",
+        cause: error,
+      });
+    }
+
+    if (errorMessage.includes("quotaExceeded")) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "YouTube API quota exceeded. Please try again later.",
+        cause: error,
+      });
+    }
+  }
+
+  // Generic error fallback
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: "An error occurred while communicating with YouTube API",
+    cause: error,
+  });
+}
 
 export const youtubeRouter = createTRPCRouter({
   fetchVideo: protectedProcedure
@@ -21,15 +69,15 @@ export const youtubeRouter = createTRPCRouter({
           status: "success",
         });
         return data.items?.[0] ?? null;
-      } catch (err: any) {
+      } catch (error: unknown) {
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "video.fetch",
           videoId: input.videoId,
           status: "error",
-          message: String(err?.message ?? err),
+          message: String(error instanceof Error ? error.message : error),
         });
-        throw err;
+        handleYouTubeError(error);
       }
     }),
 
@@ -53,15 +101,15 @@ export const youtubeRouter = createTRPCRouter({
           status: "success",
         });
         return data as unknown;
-      } catch (err: any) {
+      } catch (error: unknown) {
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "comments.list",
           videoId: input.videoId,
           status: "error",
-          message: String(err?.message ?? err),
+          message: String(error instanceof Error ? error.message : error),
         });
-        throw err;
+        handleYouTubeError(error);
       }
     }),
 
@@ -88,16 +136,16 @@ export const youtubeRouter = createTRPCRouter({
           metadata: { text: input.text },
         });
         return data as unknown;
-      } catch (err: any) {
+      } catch (error: unknown) {
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "comment.add",
           videoId: input.videoId,
           targetType: "comment",
           status: "error",
-          message: String(err?.message ?? err),
+          message: String(error instanceof Error ? error.message : error),
         });
-        throw err;
+        handleYouTubeError(error);
       }
     }),
 
@@ -119,16 +167,16 @@ export const youtubeRouter = createTRPCRouter({
           metadata: { text: input.text },
         });
         return data as unknown;
-      } catch (err: any) {
+      } catch (error: unknown) {
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "comment.reply",
           targetType: "comment",
           targetId: input.parentId,
           status: "error",
-          message: String(err?.message ?? err),
+          message: String(error instanceof Error ? error.message : error),
         });
-        throw err;
+        handleYouTubeError(error);
       }
     }),
 
@@ -148,16 +196,16 @@ export const youtubeRouter = createTRPCRouter({
           status: "success",
         });
         return { ok: true };
-      } catch (err: any) {
+      } catch (error: unknown) {
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "comment.delete",
           targetType: "comment",
           targetId: input.commentId,
           status: "error",
-          message: String(err?.message ?? err),
+          message: String(error instanceof Error ? error.message : error),
         });
-        throw err;
+        handleYouTubeError(error);
       }
     }),
 
@@ -173,7 +221,7 @@ export const youtubeRouter = createTRPCRouter({
       const { videoId, title, description } = input;
       try {
         // Get current snippet to preserve required fields like categoryId
-        const current = await youtubeFetch<any>(ctx.session.user.id, "/videos", {
+        const current = await youtubeFetch<{ items?: Array<{ snippet: { title?: string; description?: string;[key: string]: unknown } }> }>(ctx.session.user.id, "/videos", {
           query: { part: "snippet", id: videoId },
         });
         const snippet = current?.items?.[0]?.snippet ?? {};
@@ -198,15 +246,15 @@ export const youtubeRouter = createTRPCRouter({
           metadata: { title, description },
         });
         return data as unknown;
-      } catch (err: any) {
+      } catch (error: unknown) {
         await logEvent(ctx.db, {
           userId: ctx.session.user.id,
           action: "video.update",
           videoId,
           status: "error",
-          message: String(err?.message ?? err),
+          message: String(error instanceof Error ? error.message : error),
         });
-        throw err;
+        handleYouTubeError(error);
       }
     }),
 });

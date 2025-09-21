@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -15,9 +16,39 @@ import {
 } from "@/components/ui/dialog";
 import { SimpleThemeToggle } from "@/components/simple-theme-toggle";
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Trash2, AlertCircle, MessageSquareOff } from "lucide-react";
 
-type Video = any;
+type Video = {
+  snippet?: {
+    title?: string;
+    description?: string;
+  };
+  statistics?: {
+    viewCount?: string;
+    commentCount?: string;
+    likeCount?: string;
+  };
+};
+
+type Comment = {
+  id?: string;
+  snippet?: {
+    authorDisplayName?: string;
+    textDisplay?: string;
+    textOriginal?: string;
+    publishedAt?: string;
+  };
+};
+
+type CommentThread = {
+  id?: string;
+  snippet?: {
+    topLevelComment?: Comment;
+  };
+  replies?: {
+    comments?: Comment[];
+  };
+};
 
 export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   const [videoId, setVideoId] = useState("");
@@ -57,12 +88,37 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   const upsertNote = api.notes.upsert.useMutation();
 
   const video = videoQuery.data as Video | null;
-  const threads = (commentsQuery.data as any)?.items as any[] | undefined;
+  const threads = (commentsQuery.data as { items?: CommentThread[] })?.items ?? [];
 
   useEffect(() => {
-    setNoteText((noteQuery.data as any)?.content ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId, (noteQuery.data as any)?.content]);
+    setNoteText((noteQuery.data as { content?: string })?.content ?? "");
+  }, [noteQuery.data]);
+
+  // Helper function to get user-friendly error message
+  const getErrorMessage = (error: unknown): string => {
+    if (!error) return "An unexpected error occurred";
+
+    if (typeof error === 'object' && error !== null && 'message' in error) {
+      const message = (error as { message: string }).message;
+
+      if (message.includes("Comments are disabled")) {
+        return "Comments are disabled for this video";
+      }
+      if (message.includes("Access denied")) {
+        return "Access denied. Please check your permissions or try signing in again.";
+      }
+      if (message.includes("Video not found")) {
+        return "Video not found or is private";
+      }
+      if (message.includes("quota")) {
+        return "YouTube API quota exceeded. Please try again later.";
+      }
+
+      return message;
+    }
+
+    return String(error);
+  };
 
   return (
     <div className="container mx-auto max-w-5xl p-6">
@@ -110,6 +166,15 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
         </div>
       </Card>
 
+      {videoQuery.error && (
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {getErrorMessage(videoQuery.error)}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {video && (
         <Card className="mb-6 p-4">
           <div className="flex items-start justify-between gap-4">
@@ -151,6 +216,14 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                       onChange={(e) => setDescription(e.target.value)}
                       className="min-h-40"
                     />
+                    {updateVideo.error && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {getErrorMessage(updateVideo.error)}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <div className="flex justify-end gap-2">
                       <Button
                         onClick={() =>
@@ -160,8 +233,9 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
                             description: description || undefined,
                           })
                         }
+                        disabled={updateVideo.isPending}
                       >
-                        Save
+                        {updateVideo.isPending ? "Saving..." : "Save"}
                       </Button>
                     </div>
                   </div>
@@ -176,71 +250,125 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-4">
             <h3 className="mb-3 font-medium text-lg">Comments</h3>
-            <AddComment
-              onAdd={(text) => addComment.mutate({ videoId, text })}
-            />
-            <div className="mt-4 space-y-4">
-              {threads?.map((t, idx) => (
-                <div key={t?.id ?? idx} className="rounded-md border p-3">
-                  <div className="text-sm">
-                    <span className="font-medium">
-                      {t?.snippet?.topLevelComment?.snippet?.authorDisplayName}
-                    </span>
-                    <span className="ml-2 text-muted-foreground">
-                      {t?.snippet?.topLevelComment?.snippet?.publishedAt?.slice(
-                        0,
-                        10,
+
+            {commentsQuery.error && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center gap-2">
+                  {commentsQuery.error.message.includes("Comments are disabled") && (
+                    <MessageSquareOff className="h-4 w-4" />
+                  )}
+                  {getErrorMessage(commentsQuery.error)}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {!commentsQuery.error && (
+              <>
+                <AddComment
+                  onAdd={(text) => addComment.mutate({ videoId, text })}
+                  disabled={addComment.isPending}
+                />
+
+                {addComment.error && (
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {getErrorMessage(addComment.error)}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="mt-4 space-y-4">
+                  {threads.map((t, idx) => (
+                    <div key={t?.id ?? idx} className="rounded-md border p-3">
+                      <div className="text-sm">
+                        <span className="font-medium">
+                          {t?.snippet?.topLevelComment?.snippet?.authorDisplayName}
+                        </span>
+                        <span className="ml-2 text-muted-foreground">
+                          {t?.snippet?.topLevelComment?.snippet?.publishedAt?.slice(
+                            0,
+                            10,
+                          )}
+                        </span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap text-sm">
+                        {t?.snippet?.topLevelComment?.snippet?.textDisplay ??
+                          t?.snippet?.topLevelComment?.snippet?.textOriginal}
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <ReplyBox
+                          onReply={(text) =>
+                            replyToComment.mutate({
+                              parentId: t?.snippet?.topLevelComment?.id ?? "",
+                              text,
+                            })
+                          }
+                          disabled={replyToComment.isPending}
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() =>
+                            deleteComment.mutate({
+                              commentId: t?.snippet?.topLevelComment?.id ?? "",
+                            })
+                          }
+                          disabled={deleteComment.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {replyToComment.error && (
+                        <Alert className="mt-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {getErrorMessage(replyToComment.error)}
+                          </AlertDescription>
+                        </Alert>
                       )}
-                    </span>
-                  </div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm">
-                    {t?.snippet?.topLevelComment?.snippet?.textDisplay ??
-                      t?.snippet?.topLevelComment?.snippet?.textOriginal}
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <ReplyBox
-                      onReply={(text) =>
-                        replyToComment.mutate({
-                          parentId: t?.snippet?.topLevelComment?.id,
-                          text,
-                        })
-                      }
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() =>
-                        deleteComment.mutate({
-                          commentId: t?.snippet?.topLevelComment?.id,
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {t?.replies?.comments?.length ? (
-                    <div className="mt-3 border-t pt-2">
-                      {t.replies.comments.map((c: any) => (
-                        <div key={c.id} className="mt-2 text-sm">
-                          <span className="font-medium">
-                            {c?.snippet?.authorDisplayName}
-                          </span>
-                          <p className="whitespace-pre-wrap">
-                            {c?.snippet?.textDisplay ??
-                              c?.snippet?.textOriginal}
-                          </p>
+
+                      {deleteComment.error && (
+                        <Alert className="mt-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {getErrorMessage(deleteComment.error)}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {t?.replies?.comments?.length ? (
+                        <div className="mt-3 border-t pt-2">
+                          {t.replies.comments.map((c) => (
+                            <div key={c.id} className="mt-2 text-sm">
+                              <span className="font-medium">
+                                {c?.snippet?.authorDisplayName}
+                              </span>
+                              <p className="whitespace-pre-wrap">
+                                {c?.snippet?.textDisplay ??
+                                  c?.snippet?.textOriginal}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : null}
                     </div>
-                  ) : null}
+                  ))}
+                  {!threads.length && !commentsQuery.isLoading && (
+                    <div className="text-muted-foreground text-sm">
+                      No comments found.
+                    </div>
+                  )}
+                  {commentsQuery.isLoading && (
+                    <div className="text-muted-foreground text-sm">
+                      Loading comments...
+                    </div>
+                  )}
                 </div>
-              ))}
-              {!threads?.length && (
-                <div className="text-muted-foreground text-sm">
-                  No comments found.
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -276,7 +404,7 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-function AddComment({ onAdd }: { onAdd: (text: string) => void }) {
+function AddComment({ onAdd, disabled }: { onAdd: (text: string) => void; disabled?: boolean }) {
   const [text, setText] = useState("");
   return (
     <div className="flex gap-2">
@@ -284,6 +412,7 @@ function AddComment({ onAdd }: { onAdd: (text: string) => void }) {
         placeholder="Write a comment..."
         value={text}
         onChange={(e) => setText(e.target.value)}
+        disabled={disabled}
       />
       <Button
         onClick={() => {
@@ -292,6 +421,7 @@ function AddComment({ onAdd }: { onAdd: (text: string) => void }) {
             setText("");
           }
         }}
+        disabled={disabled || !text.trim()}
       >
         Comment
       </Button>
@@ -299,7 +429,7 @@ function AddComment({ onAdd }: { onAdd: (text: string) => void }) {
   );
 }
 
-function ReplyBox({ onReply }: { onReply: (text: string) => void }) {
+function ReplyBox({ onReply, disabled }: { onReply: (text: string) => void; disabled?: boolean }) {
   const [text, setText] = useState("");
   return (
     <div className="flex gap-2">
@@ -307,6 +437,7 @@ function ReplyBox({ onReply }: { onReply: (text: string) => void }) {
         placeholder="Reply..."
         value={text}
         onChange={(e) => setText(e.target.value)}
+        disabled={disabled}
       />
       <Button
         variant="secondary"
@@ -316,6 +447,7 @@ function ReplyBox({ onReply }: { onReply: (text: string) => void }) {
             setText("");
           }
         }}
+        disabled={disabled || !text.trim()}
       >
         Reply
       </Button>
