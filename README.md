@@ -1,5 +1,7 @@
 # YouTube Companion Dashboard
 
+Live: https://youtube-manager-rouge.vercel.app
+
 Mini-dashboard built with the T3 stack + shadcn/ui to manage a YouTube video: view details, manage comments, edit title/description, keep private notes, and capture event logs.
 
 ## Setup
