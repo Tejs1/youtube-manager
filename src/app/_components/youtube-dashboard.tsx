@@ -13,6 +13,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { SimpleThemeToggle } from "@/components/simple-theme-toggle";
+
+
+
 import Link from "next/link";
 
 type Video = any;
@@ -66,15 +70,18 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
     <div className="container mx-auto max-w-5xl p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-semibold text-2xl">YouTube Companion Dashboard</h1>
-        {!signedIn ? (
-          <Link href="/api/auth/signin">
-            <Button variant="default">Sign in with Google</Button>
-          </Link>
-        ) : (
-          <Link href="/api/auth/signout">
-            <Button variant="secondary">Sign out</Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <SimpleThemeToggle />
+          {!signedIn ? (
+            <Link href="/api/auth/signin">
+              <Button variant="default">Sign in with Google</Button>
+            </Link>
+          ) : (
+            <Link href="/api/auth/signout">
+              <Button variant="secondary">Sign out</Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       <Card className="mb-6 p-4">
