@@ -17,7 +17,8 @@ import {
 import { SimpleThemeToggle } from "@/components/simple-theme-toggle";
 import { extractVideoId, buildEmbedUrl, buildThumbnailUrl } from "@/lib/youtube";
 import Link from "next/link";
-import { Trash2, AlertCircle, MessageSquareOff } from "lucide-react";
+import { Trash2, AlertCircle, MessageSquareOff, Github } from "lucide-react";
+import { env } from "@/env";
 
 type Video = {
   snippet?: {
@@ -150,6 +151,18 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
         <h1 className="font-semibold text-2xl">YouTube Companion Dashboard</h1>
         <div className="flex items-center gap-2">
           <SimpleThemeToggle />
+          {env.NEXT_PUBLIC_GITHUB_URL ? (
+            <a
+              href={env.NEXT_PUBLIC_GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent"
+              title="GitHub Repository"
+              aria-label="GitHub Repository"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+          ) : null}
           {!signedIn ? (
             <Link href="/api/auth/signin">
               <Button variant="default">Sign in with Google</Button>
