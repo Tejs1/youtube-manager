@@ -1,7 +1,7 @@
+import { and, eq } from "drizzle-orm";
 import { env } from "@/env";
 import { db } from "@/server/db";
 import { accounts } from "@/server/db/schema";
-import { and, eq } from "drizzle-orm";
 
 type TokenResponse = {
 	access_token: string;

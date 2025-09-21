@@ -1,8 +1,8 @@
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { notes } from "@/server/db/schema";
 import { logEvent } from "@/server/logging";
-import { and, eq } from "drizzle-orm";
-import { z } from "zod";
 
 export const notesRouter = createTRPCRouter({
 	get: protectedProcedure

@@ -1,7 +1,7 @@
-import { eventLogs } from "@/server/db/schema";
-import type * as schema from "@/server/db/schema";
 import type { InferInsertModel } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type * as schema from "@/server/db/schema";
+import { eventLogs } from "@/server/db/schema";
 
 export async function logEvent(
 	db: PostgresJsDatabase<typeof schema>,

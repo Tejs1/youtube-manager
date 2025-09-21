@@ -1,5 +1,9 @@
 "use client";
 
+import { AlertCircle, Github, MessageSquareOff, Trash2 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { SimpleThemeToggle } from "@/components/simple-theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,6 +16,7 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { env } from "@/env";
 import {
@@ -20,9 +25,6 @@ import {
 	extractVideoId,
 } from "@/lib/youtube";
 import { api } from "@/trpc/react";
-import { AlertCircle, Github, MessageSquareOff, Trash2 } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
 
 type Video = {
 	snippet?: {
@@ -61,6 +63,7 @@ type CommentThread = {
 export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 	const utils = api.useUtils();
 	const [videoId, setVideoId] = useState("");
+	const [inputValue, setInputValue] = useState("");
 	const [editOpen, setEditOpen] = useState(false);
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
@@ -96,29 +99,30 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 	const addComment = api.youtube.addComment.useMutation({
 		onSuccess: () => void commentsQuery.refetch(),
 	});
-  const replyToComment = api.youtube.replyToComment.useMutation({
-    onSuccess: async (created: unknown, variables) => {
-      // Optimistically inject the new reply into the cached thread
-      const inputKey = { videoId, pageToken: commentsPageToken } as const;
-      utils.youtube.listComments.setData(inputKey, (old) => {
-        const data = (old as { items?: CommentThread[] } | undefined) ?? undefined;
-        if (!data?.items?.length) return old as typeof old;
-        const items = data.items.map((t) => {
-          const parentId = t?.snippet?.topLevelComment?.id;
-          if (parentId !== variables.parentId) return t;
-          const reply = created as unknown as Comment;
-          const existing = t?.replies?.comments ?? [];
-          return {
-            ...t,
-            replies: { comments: [...existing, reply] },
-          } as CommentThread;
-        });
-        return { ...(data as object), items } as unknown as typeof old;
-      });
-      // Also revalidate to refresh counts/order from server
-      await utils.youtube.listComments.invalidate({ videoId });
-    },
-  });
+	const replyToComment = api.youtube.replyToComment.useMutation({
+		onSuccess: async (created: unknown, variables) => {
+			// Optimistically inject the new reply into the cached thread
+			const inputKey = { videoId, pageToken: commentsPageToken } as const;
+			utils.youtube.listComments.setData(inputKey, (old: unknown) => {
+				const data =
+					(old as { items?: CommentThread[] } | undefined) ?? undefined;
+				if (!data?.items?.length) return old as typeof old;
+				const items = data.items.map((t) => {
+					const parentId = t?.snippet?.topLevelComment?.id;
+					if (parentId !== variables.parentId) return t;
+					const reply = created as unknown as Comment;
+					const existing = t?.replies?.comments ?? [];
+					return {
+						...t,
+						replies: { comments: [...existing, reply] },
+					} as CommentThread;
+				});
+				return { ...(data as object), items } as unknown as typeof old;
+			});
+			// Also revalidate to refresh counts/order from server
+			await utils.youtube.listComments.invalidate({ videoId });
+		},
+	});
 	const deleteComment = api.youtube.deleteComment.useMutation({
 		onSuccess: () => void commentsQuery.refetch(),
 	});
@@ -154,6 +158,15 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 		setPrevCommentTokens(() => []);
 		setPlayerLoaded(false);
 	}, [videoId]);
+
+	// Debounce input to auto-fetch
+	useEffect(() => {
+		const handle = setTimeout(() => {
+			const next = inputValue.trim();
+			if (next !== videoId) setVideoId(next);
+		}, 600);
+		return () => clearTimeout(handle);
+	}, [inputValue, videoId]);
 
 	// Helper function to get user-friendly error message
 	const getErrorMessage = (error: unknown): string => {
@@ -220,18 +233,20 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 						<Input
 							id="videoId"
 							placeholder="e.g. dQw4w9WgXcQ or https://youtu.be/dQw4w9WgXcQ"
-							value={videoId}
-							onChange={(e) => setVideoId(e.target.value.trim())}
+							value={inputValue}
+							onChange={(e) => setInputValue(e.target.value)}
 						/>
+						{videoQuery.error && !!videoId && (
+							<div className="mt-1 text-destructive text-sm">
+								{getErrorMessage(videoQuery.error)}
+							</div>
+						)}
 					</div>
 					<Button
 						className="mt-3 sm:mt-6"
 						onClick={() => {
-							if (videoId) {
-								void videoQuery.refetch();
-								void commentsQuery.refetch();
-								void noteQuery.refetch();
-							}
+							const next = inputValue.trim();
+							setVideoId(next);
 						}}
 					>
 						Load
@@ -250,7 +265,12 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 
 			{videoQuery.isLoading && (
 				<Card className="mb-6 p-4">
-					<div className="text-muted-foreground text-sm">Loading video...</div>
+					<div className="space-y-3">
+						<Skeleton className="h-6 w-56" />
+						<Skeleton className="aspect-video w-full" />
+						<Skeleton className="h-4 w-3/4" />
+						<Skeleton className="h-4 w-1/2" />
+					</div>
 				</Card>
 			)}
 
@@ -275,15 +295,7 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 											onLoad={() => setPlayerLoaded(true)}
 										/>
 									</div>
-									{!playerLoaded && (
-										<div className="mt-3">
-											<img
-												src={buildThumbnailUrl(vid, "hq")}
-												alt="Video thumbnail"
-												className="h-auto w-full max-w-md rounded-md border"
-											/>
-										</div>
-									)}
+									{!playerLoaded && <Thumbnail vid={vid} />}
 								</div>
 							) : null;
 						})()}
@@ -377,10 +389,10 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 
 						{!commentsQuery.error && (
 							<>
-                <AddComment
-                  onAdd={(text) => addComment.mutate({ videoId, text })}
-                  disabled={addComment.isPending || commentsQuery.isLoading}
-                />
+								<AddComment
+									onAdd={(text) => addComment.mutate({ videoId, text })}
+									disabled={addComment.isPending || commentsQuery.isLoading}
+								/>
 
 								{addComment.error && (
 									<Alert className="mt-2">
@@ -560,8 +572,28 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 										</div>
 									)}
 									{commentsQuery.isLoading && (
-										<div className="text-muted-foreground text-sm">
-											Loading comments...
+										<div className="space-y-3">
+											{["s1", "s2", "s3"].map((k) => (
+												<div key={k} className="rounded-md border p-3">
+													<div className="flex items-center gap-2">
+														<Skeleton className="h-4 w-40" />
+														<Skeleton className="h-3 w-16" />
+													</div>
+													<div className="mt-2 space-y-2">
+														<Skeleton className="h-4 w-full" />
+														<Skeleton className="h-4 w-5/6" />
+													</div>
+													<div className="mt-3 flex gap-2">
+														<Skeleton className="h-8 w-20" />
+														<Skeleton className="h-8 w-20" />
+														<Skeleton className="h-8 w-9" />
+													</div>
+													<div className="mt-3 space-y-2 border-t pt-2">
+														<Skeleton className="h-4 w-2/3" />
+														<Skeleton className="h-4 w-1/2" />
+													</div>
+												</div>
+											))}
 										</div>
 									)}
 									{(() => {
@@ -660,7 +692,10 @@ export function YouTubeDashboard({ signedIn }: { signedIn: boolean }) {
 function AddComment({
 	onAdd,
 	disabled,
-}: { onAdd: (text: string) => void; disabled?: boolean }) {
+}: {
+	onAdd: (text: string) => void;
+	disabled?: boolean;
+}) {
 	const [text, setText] = useState("");
 	return (
 		<div className="flex gap-2">
@@ -688,7 +723,10 @@ function AddComment({
 function ReplyBox({
 	onReply,
 	disabled,
-}: { onReply: (text: string) => void; disabled?: boolean }) {
+}: {
+	onReply: (text: string) => void;
+	disabled?: boolean;
+}) {
 	const [text, setText] = useState("");
 	return (
 		<div className="flex gap-2">
@@ -724,7 +762,19 @@ function EditBox({
 	disabled?: boolean;
 }) {
 	const [text, setText] = useState(initialText);
+	const [editing, setEditing] = useState(false);
 	useEffect(() => setText(initialText), [initialText]);
+	if (!editing) {
+		return (
+			<Button
+				variant="secondary"
+				onClick={() => setEditing(true)}
+				disabled={disabled}
+			>
+				Edit
+			</Button>
+		);
+	}
 	return (
 		<div className="flex gap-2">
 			<Input
@@ -735,12 +785,43 @@ function EditBox({
 			/>
 			<Button
 				onClick={() => {
-					if (text.trim()) onSave(text.trim());
+					if (text.trim()) {
+						onSave(text.trim());
+						setEditing(false);
+					}
 				}}
 				disabled={disabled || !text.trim()}
 			>
 				Save
 			</Button>
+			<Button
+				variant="ghost"
+				onClick={() => {
+					setText(initialText);
+					setEditing(false);
+				}}
+				disabled={disabled}
+			>
+				Cancel
+			</Button>
+		</div>
+	);
+}
+
+function Thumbnail({ vid }: { vid: string }) {
+	const src = buildThumbnailUrl(vid, "hq");
+	return (
+		<div className="mt-3 max-w-md">
+			<div className="relative aspect-video w-full overflow-hidden rounded-md border bg-muted">
+				<Image
+					src={src}
+					alt="Video thumbnail"
+					fill
+					sizes="(max-width: 768px) 100vw, 480px"
+					priority={false}
+					style={{ objectFit: "cover" }}
+				/>
+			</div>
 		</div>
 	);
 }

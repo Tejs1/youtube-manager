@@ -1,9 +1,8 @@
 "use client";
 
-import { useTheme } from "@/hooks/use-theme";
 import { Moon, Sun } from "lucide-react";
-
 import { Toggle } from "@/components/ui/toggle";
+import { useTheme } from "@/hooks/use-theme";
 
 export function SimpleThemeToggle() {
 	const { toggleTheme, isDark } = useTheme();

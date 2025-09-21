@@ -1,9 +1,9 @@
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { extractVideoId } from "@/lib/youtube";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { getMyChannelId, youtubeFetch } from "@/server/google";
 import { logEvent } from "@/server/logging";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 // Helper function to handle YouTube API errors
 function handleYouTubeError(error: unknown): never {

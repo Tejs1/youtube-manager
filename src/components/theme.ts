@@ -1,4 +1,4 @@
-export { ThemeToggle } from "./theme-toggle";
+export { useTheme } from "../hooks/use-theme";
 export { SimpleThemeToggle } from "./simple-theme-toggle";
 export { ThemeProvider } from "./theme-provider";
-export { useTheme } from "../hooks/use-theme";
+export { ThemeToggle } from "./theme-toggle";
