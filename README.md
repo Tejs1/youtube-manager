@@ -56,6 +56,29 @@ All endpoints are authenticated unless noted. They are exposed via tRPC under `/
 
 Event logs are captured automatically for all above actions.
 
+## Using the tRPC API (HTTP)
+
+Most procedures require you to be signed in (cookie-based auth).
+
+- Base endpoint: `/api/trpc` (prod: `https://youtube-manager-rouge.vercel.app/api/trpc`)
+- Auth: sign in on the site to get a session cookie. In Postman, include the domain cookie (e.g. `authjs.session-token`).
+
+Examples
+
+- Fetch video (GET):
+  - `GET /api/trpc/youtube.fetchVideo?input=%7B%22json%22%3A%7B%22videoId%22%3A%22dQw4w9WgXcQ%22%7D%7D`
+
+- Add comment (POST):
+  - `POST /api/trpc/youtube.addComment`
+  - Body (JSON): `{ "json": { "videoId": "dQw4w9WgXcQ", "text": "Hello!" } }`
+
+Browser console quick test (authenticated):
+
+```js
+fetch('/api/trpc/youtube.fetchVideo?input=' + encodeURIComponent(JSON.stringify({ json: { videoId: 'dQw4w9WgXcQ' } })), { credentials: 'include' })
+  .then(r => r.json()).then(console.log)
+```
+
 ## Database Schema (Drizzle)
 
 Tables added on top of NextAuth defaults:
